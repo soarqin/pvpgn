@@ -47,6 +47,14 @@ namespace pvpgn
 namespace bnetd
 {
 
+/* custom functions */
+
+extern unsigned int account_get_actived(t_account * account)
+{
+		return account_get_numattr(account,"custom\\user\\actived");
+}
+
+
 static unsigned int char_icon_to_uint(const char * icon);
 
 extern unsigned int account_get_numattr_real(t_account * account, char const * key, char const * fn, unsigned int ln)
