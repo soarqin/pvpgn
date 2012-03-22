@@ -96,7 +96,8 @@ namespace bnetd
 extern int		anongame_matchlists_create(void);
 extern int		anongame_matchlists_destroy(void);
 
-extern int		handle_anongame_search(t_connection * c, t_packet const * packet);
+//extern int		handle_anongame_search(t_connection * c, t_packet const * packet);
+extern int _handle_anongame_search(t_connection * c, t_packet const *packet);
 extern int		anongame_unqueue(t_connection * c, int queue);
 
 extern char		anongame_arranged(int queue);

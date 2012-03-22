@@ -87,6 +87,8 @@ extern int account_get_auth_lock(t_account * account);
 extern int account_set_auth_lock(t_account * account, int val);
 extern int account_set_auth_mute(t_account * account, int val);
 extern int account_get_auth_mute(t_account * account);
+extern int account_set_auth_ladderban(t_account * account, int val);
+extern int account_get_auth_ladderban(t_account * account);
 
 /* profile */
 extern char const * account_get_sex(t_account * account); /* the profile attributes are updated directly in bnetd.c */
@@ -96,6 +98,7 @@ extern char const * account_get_desc(t_account * account);
 
 /* last login */
 extern unsigned int account_get_ll_time(t_account * account);
+extern unsigned int account_get_ll_ctime(t_account * account);
 extern int account_set_ll_time(t_account * account, unsigned int t);
 extern char const * account_get_ll_user(t_account * account);
 extern int account_set_ll_user(t_account * account, char const * user);
@@ -155,6 +158,7 @@ extern unsigned int account_get_ladder_rating(t_account * account, t_clienttag c
 extern int account_set_ladder_rating(t_account * account, t_clienttag clienttag, t_ladder_id id,unsigned rating);
 extern int account_adjust_ladder_rating(t_account * account, t_clienttag clienttag, t_ladder_id id, int delta);
 extern int account_get_ladder_rank(t_account * account, t_clienttag clienttag, t_ladder_id id);
+extern int account_get_ladder_rank2(t_account * account, t_clienttag clienttag, const char* id);
 extern int account_set_ladder_rank(t_account * account, t_clienttag clienttag, t_ladder_id id, unsigned int rank);
 extern unsigned int account_get_ladder_high_rating(t_account * account, t_clienttag clienttag, t_ladder_id id);
 extern unsigned int account_get_ladder_high_rank(t_account * account, t_clienttag clienttag, t_ladder_id id);
@@ -233,6 +237,8 @@ extern int account_set_user_icon( t_account * account, t_clienttag clienttag,cha
 extern char const * account_get_user_icon( t_account * account, t_clienttag clienttag );
 extern unsigned int account_icon_to_profile_icon(char const * icon,t_account * account, t_clienttag ctag);
 extern char const * account_icon_default(t_account * account, t_clienttag clienttag);
+extern int account_set_auth_icon(t_account * account, char const * icon_name, int val);
+extern int account_get_auth_icon(t_account * account, char const * icon_name);
 
 extern int account_is_operator_or_admin(t_account * account, char const * channel);
 

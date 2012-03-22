@@ -342,6 +342,8 @@ static int _handle_lockacct_command(t_connection * c, char const * text);
 static int _handle_unlockacct_command(t_connection * c, char const * text);
 static int _handle_muteacct_command(t_connection * c, char const * text);
 static int _handle_unmuteacct_command(t_connection * c, char const * text);
+static int _handle_ladderban_command(t_connection * c, char const * text);
+static int _handle_ladderunban_command(t_connection * c, char const * text);
 static int _handle_flag_command(t_connection * c, char const * text);
 static int _handle_tag_command(t_connection * c, char const * text);
 //static int _handle_ipban_command(t_connection * c, char const * text); Redirected to handle_ipban_command() in ipban.c [Omega]
@@ -354,6 +356,14 @@ static int _handle_topic_command(t_connection * c, char const * text);
 static int _handle_moderate_command(t_connection * c, char const * text);
 static int _handle_clearstats_command(t_connection * c, char const * text);
 static int _handle_tos_command(t_connection * c, char const * text);
+static int _handle_swapicon_command(t_connection * c, char const *text);
+static int _handle_seticon_command(t_connection * c, char const *text);
+
+//shakar patch _handle_commands
+static int _handle_atstats_command(t_connection * c, char const * text);
+static int _handle_racestats_command(t_connection * c, char const * text);
+static int _handle_operators_command(t_connection * c, char const * text);
+
 
 static const t_command_table_row standard_command_table[] =
 {
@@ -384,6 +394,8 @@ static const t_command_table_row standard_command_table[] =
 	{ "/uptime"             , _handle_uptime_command },
 	{ "/stats"              , _handle_stats_command },
 	{ "/astat"              , _handle_stats_command },
+	{ "/atstats"            , _handle_atstats_command },
+	{ "/racestats"          , _handle_racestats_command },	
 	{ "/time"               , _handle_time_command },
         { "/channel"            , _handle_channel_command },
 	{ "/join"               , _handle_channel_command },
@@ -394,7 +406,7 @@ static const t_command_table_row standard_command_table[] =
 	{ "/squelch"            , _handle_squelch_command },
 	{ "/unignore"           , _handle_unsquelch_command },
 	{ "/unsquelch"          , _handle_unsquelch_command },
-//	{ "/designate"          , _handle_designate_command }, Obsotele command [Omega]
+	{ "/designate"          , _handle_finger_command },
 //	{ "/resign"             , _handle_resign_command }, Obsolete command [Omega]
 	{ "/kick"               , _handle_kick_command },
 	{ "/ban"                , _handle_ban_command },
@@ -433,6 +445,8 @@ static const t_command_table_row extended_command_table[] =
 	{ "/devoice"            , _handle_devoice_command },
 	{ "/vop"                , _handle_vop_command },
 	{ "/admins"             , _handle_admins_command },
+	{ "/operators"             , _handle_operators_command },
+	{ "/ops"             , _handle_operators_command },
 	{ "/logout"             , _handle_quit_command },
 	{ "/quit"               , _handle_quit_command },
 	{ "/exit"               , _handle_quit_command },
@@ -452,8 +466,12 @@ static const t_command_table_row extended_command_table[] =
 	{ "/unlockacct"         , _handle_unlockacct_command },
 	{ "/muteacct"           , _handle_muteacct_command },
 	{ "/unmuteacct"         , _handle_unmuteacct_command },
+	{ "/ladderban"           , _handle_ladderban_command },
+	{ "/ladderunban"         , _handle_ladderunban_command },
 	{ "/flag"               , _handle_flag_command },
 	{ "/tag"                , _handle_tag_command },
+	{ "/icon"               , _handle_swapicon_command },
+	{ "/seticon"            , _handle_seticon_command },	
 	{ "/help"               , handle_help_command },
 	{ "/mail"               , handle_mail_command },
 	{ "/ipban"              , handle_ipban_command }, // in ipban.c
@@ -550,6 +568,8 @@ static int _handle_clan_command(t_connection * c, char const * text)
   t_clanmember * member;
   t_clan * clan;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   if (!(acc = conn_get_account(c))){
       ERROR0("got NULL account");
   }
@@ -742,6 +762,9 @@ static int _handle_clan_command(t_connection * c, char const * text)
               if (j<sizeof(clanname)-1) clanname[j++] = text[i];
           clanname[j] = '\0';
 
+		message_send_text(c,message_type_error,c,"clan create command is disabled on EuroBattle.Net!");
+        return 0;		
+			
           if ((clantag[0]=='\0') || (clanname[0]=='\0')) {
               message_send_text(c,message_type_info,c,"usage:");
               message_send_text(c,message_type_info,c,"/clan create <clantag> <clanname>  (Create a new clan)");
@@ -790,6 +813,8 @@ static int _handle_admin_command(t_connection * c, char const * text)
     t_connection *	dst_c;
     int			changed=0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     text = skip_command(text);
 
     if ((text[0]=='\0') || ((text[0] != '+') && (text[0] != '-'))) {
@@ -847,6 +872,8 @@ static int _handle_operator_command(t_connection * c, char const * text)
     t_connection *	dst_c;
     int			changed = 0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     text = skip_command(text);
 
     if ((text[0]=='\0') || ((text[0] != '+') && (text[0] != '-'))) {
@@ -904,6 +931,8 @@ static int _handle_aop_command(t_connection * c, char const * text)
     t_connection *	dst_c;
     int			changed = 0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     if (!(conn_get_channel(c)) || !(channel = channel_get_name(conn_get_channel(c)))) {
 	message_send_text(c,message_type_error,c,"This command can only be used inside a channel.");
 	return -1;
@@ -952,6 +981,8 @@ static int _handle_vop_command(t_connection * c, char const * text)
     t_connection *	dst_c;
     int			changed = 0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     if (!(conn_get_channel(c)) || !(channel = channel_get_name(conn_get_channel(c)))) {
 	message_send_text(c,message_type_error,c,"This command can only be used inside a channel.");
 	return -1;
@@ -1000,6 +1031,8 @@ static int _handle_voice_command(t_connection * c, char const * text)
     t_connection *	dst_c;
     int			changed = 0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     if (!(conn_get_channel(c)) || !(channel = channel_get_name(conn_get_channel(c)))) {
 	message_send_text(c,message_type_error,c,"This command can only be used inside a channel.");
 	return -1;
@@ -1064,6 +1097,8 @@ static int _handle_devoice_command(t_connection * c, char const * text)
     int			done = 0;
     int			changed = 0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     if (!(conn_get_channel(c)) || !(channel = channel_get_name(conn_get_channel(c)))) {
 	message_send_text(c,message_type_error,c,"This command can only be used inside a channel.");
 	return -1;
@@ -1139,6 +1174,8 @@ static int _handle_op_command(t_connection * c, char const * text)
     t_connection * 	dst_c;
     int			changed = 0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     if (!(conn_get_channel(c)) || !(channel = channel_get_name(conn_get_channel(c)))) {
 	message_send_text(c,message_type_error,c,"This command can only be used inside a channel.");
 	return -1;
@@ -1215,6 +1252,8 @@ static int _handle_tmpop_command(t_connection * c, char const * text)
     t_connection *	dst_c;
     int			changed = 0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     if (!(conn_get_channel(c)) || !(channel = channel_get_name(conn_get_channel(c)))) {
 	message_send_text(c,message_type_error,c,"This command can only be used inside a channel.");
 	return -1;
@@ -1275,6 +1314,8 @@ static int _handle_deop_command(t_connection * c, char const * text)
     t_connection *	dst_c;
     int			done = 0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     if (!(conn_get_channel(c)) || !(channel = channel_get_name(conn_get_channel(c)))) {
 	message_send_text(c,message_type_error,c,"This command can only be used inside a channel.");
 	return -1;
@@ -1381,6 +1422,8 @@ static int _handle_friends_command(t_connection * c, char const * text)
     int i;
     t_account *my_acc = conn_get_account(c);
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     text = skip_command(text);;
 
     if (strstart(text,"add")==0 || strstart(text,"a")==0) {
@@ -1660,7 +1703,7 @@ static int _handle_friends_command(t_connection * c, char const * text)
 	int num;
 	unsigned int uid;
 
-	message_send_text(c,message_type_info,c,"Your PvPGN - Friends List");
+	message_send_text(c,message_type_info,c,"Your EuroBattle.Net - Friends List");
 	message_send_text(c,message_type_info,c,"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
 	num = account_get_friendcount(my_acc);
 
@@ -1726,6 +1769,8 @@ static int _handle_me_command(t_connection * c, char const * text)
 {
   t_channel const * channel;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   if (!(channel = conn_get_channel(c)))
     {
       message_send_text(c,message_type_error,c,"You are not in a channel.");
@@ -1744,6 +1789,8 @@ static int _handle_whisper_command(t_connection * c, char const *text)
   char         dest[MAX_USERNAME_LEN+MAX_REALMNAME_LEN]; /* both include NUL, so no need to add one for middle @ or * */
   unsigned int i,j;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
@@ -1768,6 +1815,8 @@ static int _handle_status_command(t_connection * c, char const *text)
     unsigned int i,j;
     t_clienttag clienttag;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
     for (; text[i]==' '; i++);
     for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get clienttag */
@@ -1952,6 +2001,8 @@ static int _handle_who_command(t_connection * c, char const *text)
   unsigned int         i;
   char const *         tname;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
 
@@ -1995,6 +2046,8 @@ static int _handle_whois_command(t_connection * c, char const * text)
 {
   unsigned int i;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
 
@@ -2013,6 +2066,8 @@ static int _handle_whoami_command(t_connection * c, char const *text)
 {
   char const * tname;
 
+    eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+  
   if (!(tname = conn_get_username(c)))
     {
       message_send_text(c,message_type_error,c,"Unable to obtain your account name.");
@@ -2029,6 +2084,8 @@ static int _handle_announce_command(t_connection * c, char const *text)
   unsigned int i;
   t_message *  message;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
 
@@ -2053,18 +2110,21 @@ static int _handle_announce_command(t_connection * c, char const *text)
 
 static int _handle_beep_command(t_connection * c, char const *text)
 {
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
   message_send_text(c,message_type_info,c,"Audible notification on."); /* FIXME: actually do something */
   return 0; /* FIXME: these only affect CHAT clients... I think they prevent ^G from being sent */
 }
 
 static int _handle_nobeep_command(t_connection * c, char const *text)
 {
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
   message_send_text(c,message_type_info,c,"Audible notification off."); /* FIXME: actually do something */
   return 0;
 }
 
 static int _handle_version_command(t_connection * c, char const *text)
 {
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
   message_send_text(c,message_type_info,c,PVPGN_SOFTWARE" "PVPGN_VERSION);
   return 0;
 }
@@ -2091,6 +2151,7 @@ static int _handle_copyright_command(t_connection * c, char const *text)
       NULL
     };
   unsigned int i;
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
 
   for (i=0; info[i]; i++)
     message_send_text(c,message_type_info,c,info[i]);
@@ -2100,7 +2161,7 @@ static int _handle_copyright_command(t_connection * c, char const *text)
 
 static int _handle_uptime_command(t_connection * c, char const *text)
 {
-
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
   snprintf(msgtemp, sizeof(msgtemp), "Uptime: %s",seconds_to_timestr(server_get_uptime()));
   message_send_text(c,message_type_info,c,msgtemp);
 
@@ -2116,6 +2177,8 @@ static int _handle_stats_command(t_connection * c, char const *text)
     t_clienttag  clienttag_uint;
     char         clienttag_str[5];
 
+	  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+	
     for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
     for (; text[i]==' '; i++);
     for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
@@ -2206,7 +2269,7 @@ static int _handle_stats_command(t_connection * c, char const *text)
 		account_get_ladder_level(account,clienttag_uint,ladder_id_solo),
 		account_get_ladder_xp(account,clienttag_uint,ladder_id_solo));
 	    message_send_text(c,message_type_info,c,msgtemp);
-	    snprintf(msgtemp, sizeof(msgtemp), "SOLO Ladder Record: %u-%u-0",
+	    snprintf(msgtemp, sizeof(msgtemp), "SOLO Ladder Record: %u-%u",
 		account_get_ladder_wins(account,clienttag_uint,ladder_id_solo),
 		account_get_ladder_losses(account,clienttag_uint,ladder_id_solo));
 	    message_send_text(c,message_type_info,c,msgtemp);
@@ -2217,7 +2280,7 @@ static int _handle_stats_command(t_connection * c, char const *text)
 		account_get_ladder_level(account,clienttag_uint,ladder_id_team),
 		account_get_ladder_xp(account,clienttag_uint,ladder_id_team));
 	    message_send_text(c,message_type_info,c,msgtemp);
-	    snprintf(msgtemp, sizeof(msgtemp), "TEAM Ladder Record: %u-%u-0",
+	    snprintf(msgtemp, sizeof(msgtemp), "TEAM Ladder Record: %u-%u",
 		account_get_ladder_wins(account,clienttag_uint,ladder_id_team),
 		account_get_ladder_losses(account,clienttag_uint,ladder_id_team));
 	    message_send_text(c,message_type_info,c,msgtemp);
@@ -2228,14 +2291,14 @@ static int _handle_stats_command(t_connection * c, char const *text)
 		account_get_ladder_level(account,clienttag_uint,ladder_id_ffa),
 		account_get_ladder_xp(account,clienttag_uint,ladder_id_ffa));
 	    message_send_text(c,message_type_info,c,msgtemp);
-	    snprintf(msgtemp, sizeof(msgtemp), "FFA Ladder Record: %u-%u-0",
+	    snprintf(msgtemp, sizeof(msgtemp), "FFA Ladder Record: %u-%u",
 		account_get_ladder_wins(account,clienttag_uint,ladder_id_ffa),
 		account_get_ladder_losses(account,clienttag_uint,ladder_id_ffa));
 	    message_send_text(c,message_type_info,c,msgtemp);
 	    snprintf(msgtemp, sizeof(msgtemp), "FFA Rank: %u",
 		account_get_ladder_rank(account,clienttag_uint,ladder_id_ffa));
 	    message_send_text(c,message_type_info,c,msgtemp);
-	    if (account_get_teams(account)) {
+/*	    if (account_get_teams(account)) {
 		t_elem * curr;
 		t_list * list;
 		t_team * team;
@@ -2267,7 +2330,305 @@ static int _handle_stats_command(t_connection * c, char const *text)
 			team_get_rank(team));
 		    message_send_text(c,message_type_info,c,msgtemp);
 		}
-	    }
+	    } */
+	    return 0;
+	default:
+	    snprintf(msgtemp, sizeof(msgtemp), "%.64s's record:",account_get_name(account));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Normal games: %u-%u-%u",
+		account_get_normal_wins(account,clienttag_uint),
+		account_get_normal_losses(account,clienttag_uint),
+		account_get_normal_disconnects(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    if (account_get_ladder_rating(account,clienttag_uint,ladder_id_normal)>0)
+		snprintf(msgtemp, sizeof(msgtemp), "Ladder games: %u-%u-%u (rating %d)",
+		    account_get_ladder_wins(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_losses(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_disconnects(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_rating(account,clienttag_uint,ladder_id_normal));
+	    else
+		std::strcpy(msgtemp,"Ladder games: 0-0-0");
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    return 0;
+    }
+}
+
+static int _handle_atstats_command(t_connection * c, char const *text)
+{
+    char         dest[MAX_USERNAME_LEN];
+    unsigned int i,j;
+    t_account *  account;
+    char const * clienttag=NULL;
+    t_clienttag  clienttag_uint;
+    char         clienttag_str[5];
+
+eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+
+    for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
+    for (; text[i]==' '; i++);
+    for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
+	if (j<sizeof(dest)-1) dest[j++] = text[i];
+    dest[j] = '\0';
+    for (; text[i]==' '; i++);
+
+    if (!dest[0]) {
+	account = conn_get_account(c);
+    } else if (!(account = accountlist_find_account(dest))) {
+	message_send_text(c,message_type_error,c,"Invalid user.");
+       return 0;
+     }
+
+    if (text[i]!='\0')
+	clienttag = &text[i];
+    else if (!(clienttag = tag_uint_to_str(clienttag_str,conn_get_clienttag(c)))) {
+	message_send_text(c,message_type_error,c,"Unable to determine client game.");
+	   return 0;
+	}
+
+    if (std::strlen(clienttag)!=4) {
+	snprintf(msgtemp, sizeof(msgtemp), "You must supply a user name and a valid program ID. (Program ID \"%.32s\" is invalid.)",clienttag);
+		message_send_text(c,message_type_error,c,msgtemp);
+	message_send_text(c,message_type_error,c,"Example: /stats joe STAR");
+		return 0;
+	}
+
+    clienttag_uint = tag_case_str_to_uint(clienttag);
+
+    switch (clienttag_uint)
+    {
+	case CLIENTTAG_BNCHATBOT_UINT:
+	    message_send_text(c,message_type_error,c,"This game does not support win/loss records.");
+	    message_send_text(c,message_type_error,c,"You must supply a user name and a valid program ID.");
+	    message_send_text(c,message_type_error,c,"Example: /stats joe STAR");
+   return 0;
+	case CLIENTTAG_DIABLORTL_UINT:
+	case CLIENTTAG_DIABLOSHR_UINT:
+	    snprintf(msgtemp, sizeof(msgtemp), "%.64s's record:",account_get_name(account));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "level: %u",account_get_normal_level(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "class: %.16s",bnclass_get_str(account_get_normal_class(account,clienttag_uint)));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "stats: %u str  %u mag  %u dex  %u vit  %u gld",
+		account_get_normal_strength(account,clienttag_uint),
+		account_get_normal_magic(account,clienttag_uint),
+		account_get_normal_dexterity(account,clienttag_uint),
+		account_get_normal_vitality(account,clienttag_uint),
+		account_get_normal_gold(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Diablo kills: %u",account_get_normal_diablo_kills(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+  return 0;
+	case CLIENTTAG_WARCIIBNE_UINT:
+	    snprintf(msgtemp, sizeof(msgtemp), "%.64s's record:",account_get_name(account));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Normal games: %u-%u-%u",
+		account_get_normal_wins(account,clienttag_uint),
+		account_get_normal_losses(account,clienttag_uint),
+		account_get_normal_disconnects(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    if (account_get_ladder_rating(account,clienttag_uint,ladder_id_normal)>0)
+		snprintf(msgtemp, sizeof(msgtemp), "Ladder games: %u-%u-%u (rating %d)",
+		    account_get_ladder_wins(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_losses(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_disconnects(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_rating(account,clienttag_uint,ladder_id_normal));
+      else
+		std::strcpy(msgtemp,"Ladder games: 0-0-0");
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    if (account_get_ladder_rating(account,clienttag_uint,ladder_id_ironman)>0)
+		snprintf(msgtemp, sizeof(msgtemp), "IronMan games: %u-%u-%u (rating %d)",
+		    account_get_ladder_wins(account,clienttag_uint,ladder_id_ironman),
+		    account_get_ladder_losses(account,clienttag_uint,ladder_id_ironman),
+		    account_get_ladder_disconnects(account,clienttag_uint,ladder_id_ironman),
+		    account_get_ladder_rating(account,clienttag_uint,ladder_id_ironman));
+  else
+		std::strcpy(msgtemp,"IronMan games: 0-0-0");
+	    message_send_text(c,message_type_info,c,msgtemp);
+  return 0;
+	case CLIENTTAG_WARCRAFT3_UINT:
+	case CLIENTTAG_WAR3XP_UINT:
+	    if (account_get_teams(account)) {
+		t_elem * curr;
+		t_list * list;
+		t_team * team;
+		int teamcount = 0;
+
+		list = account_get_teams(account);
+
+		LIST_TRAVERSE(list,curr)
+    {
+	    	  if (!(team = (t_team*)elem_get_data(curr)))
+      {
+	      	    eventlog(eventlog_level_error, __FUNCTION__, "found NULL entry in list");
+	      	    continue;
+      }
+
+	          if (team_get_clienttag(team) != clienttag_uint)
+	            continue;
+
+		    teamcount++;
+		    snprintf(msgtemp, sizeof(msgtemp), "Users AT Team No. %u",teamcount);
+		    message_send_text(c,message_type_info,c,msgtemp);
+		    snprintf(msgtemp, sizeof(msgtemp), "Users AT TEAM Level: %u, Experience: %u",
+			team_get_level(team),team_get_xp(team));
+		    message_send_text(c,message_type_info,c,msgtemp);
+		    snprintf(msgtemp, sizeof(msgtemp), "AT TEAM Ladder Record: %u-%u-0",
+			team_get_wins(team),team_get_losses(team));
+		    message_send_text(c,message_type_info,c,msgtemp);
+		    snprintf(msgtemp, sizeof(msgtemp), "AT TEAM Rank: %u",
+			team_get_rank(team));
+		    message_send_text(c,message_type_info,c,msgtemp);
+      }
+    }
+  else
+    {
+			snprintf(msgtemp, sizeof(msgtemp), "No team stats on record for %.64s using Warcraft III",account_get_name(account));
+			message_send_text(c,message_type_info,c,msgtemp);
+    }
+  return 0;
+	default:
+	    snprintf(msgtemp, sizeof(msgtemp), "%.64s's record:",account_get_name(account));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Normal games: %u-%u-%u",
+		account_get_normal_wins(account,clienttag_uint),
+		account_get_normal_losses(account,clienttag_uint),
+		account_get_normal_disconnects(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    if (account_get_ladder_rating(account,clienttag_uint,ladder_id_normal)>0)
+		snprintf(msgtemp, sizeof(msgtemp), "Ladder games: %u-%u-%u (rating %d)",
+		    account_get_ladder_wins(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_losses(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_disconnects(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_rating(account,clienttag_uint,ladder_id_normal));
+	    else
+		std::strcpy(msgtemp,"Ladder games: 0-0-0");
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    return 0;
+    }
+}
+
+static int _handle_racestats_command(t_connection * c, char const *text)
+{
+    char         dest[MAX_USERNAME_LEN];
+    unsigned int i,j;
+  t_account *  account;
+    char const * clienttag=NULL;
+    t_clienttag  clienttag_uint;
+    char         clienttag_str[5];
+
+eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+
+    for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
+    for (; text[i]==' '; i++);
+    for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
+	if (j<sizeof(dest)-1) dest[j++] = text[i];
+    dest[j] = '\0';
+    for (; text[i]==' '; i++);
+
+    if (!dest[0]) {
+	account = conn_get_account(c);
+    } else if (!(account = accountlist_find_account(dest))) {
+	message_send_text(c,message_type_error,c,"Invalid user.");
+	return 0;
+    }
+
+    if (text[i]!='\0')
+	clienttag = &text[i];
+    else if (!(clienttag = tag_uint_to_str(clienttag_str,conn_get_clienttag(c)))) {
+	message_send_text(c,message_type_error,c,"Unable to determine client game.");
+	return 0;
+    }
+
+    if (std::strlen(clienttag)!=4) {
+	snprintf(msgtemp, sizeof(msgtemp), "You must supply a user name and a valid program ID. (Program ID \"%.32s\" is invalid.)",clienttag);
+	message_send_text(c,message_type_error,c,msgtemp);
+	message_send_text(c,message_type_error,c,"Example: /stats joe STAR");
+	return 0;
+    }
+
+    clienttag_uint = tag_case_str_to_uint(clienttag);
+
+    switch (clienttag_uint)
+    {
+	case CLIENTTAG_BNCHATBOT_UINT:
+	    message_send_text(c,message_type_error,c,"This game does not support win/loss records.");
+	    message_send_text(c,message_type_error,c,"You must supply a user name and a valid program ID.");
+	    message_send_text(c,message_type_error,c,"Example: /stats joe STAR");
+	    return 0;
+	case CLIENTTAG_DIABLORTL_UINT:
+	case CLIENTTAG_DIABLOSHR_UINT:
+	    snprintf(msgtemp, sizeof(msgtemp), "%.64s's record:",account_get_name(account));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "level: %u",account_get_normal_level(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "class: %.16s",bnclass_get_str(account_get_normal_class(account,clienttag_uint)));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "stats: %u str  %u mag  %u dex  %u vit  %u gld",
+		account_get_normal_strength(account,clienttag_uint),
+		account_get_normal_magic(account,clienttag_uint),
+		account_get_normal_dexterity(account,clienttag_uint),
+		account_get_normal_vitality(account,clienttag_uint),
+		account_get_normal_gold(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Diablo kills: %u",account_get_normal_diablo_kills(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    return 0;
+	case CLIENTTAG_WARCIIBNE_UINT:
+	    snprintf(msgtemp, sizeof(msgtemp), "%.64s's record:",account_get_name(account));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Normal games: %u-%u-%u",
+		account_get_normal_wins(account,clienttag_uint),
+		account_get_normal_losses(account,clienttag_uint),
+		account_get_normal_disconnects(account,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    if (account_get_ladder_rating(account,clienttag_uint,ladder_id_normal)>0)
+		snprintf(msgtemp, sizeof(msgtemp), "Ladder games: %u-%u-%u (rating %d)",
+		    account_get_ladder_wins(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_losses(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_disconnects(account,clienttag_uint,ladder_id_normal),
+		    account_get_ladder_rating(account,clienttag_uint,ladder_id_normal));
+	    else
+		std::strcpy(msgtemp,"Ladder games: 0-0-0");
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    if (account_get_ladder_rating(account,clienttag_uint,ladder_id_ironman)>0)
+		snprintf(msgtemp, sizeof(msgtemp), "IronMan games: %u-%u-%u (rating %d)",
+		    account_get_ladder_wins(account,clienttag_uint,ladder_id_ironman),
+		    account_get_ladder_losses(account,clienttag_uint,ladder_id_ironman),
+		    account_get_ladder_disconnects(account,clienttag_uint,ladder_id_ironman),
+		    account_get_ladder_rating(account,clienttag_uint,ladder_id_ironman));
+	    else
+		std::strcpy(msgtemp,"IronMan games: 0-0-0");
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    return 0;
+	case CLIENTTAG_WARCRAFT3_UINT:
+	case CLIENTTAG_WAR3XP_UINT:
+	    snprintf(msgtemp, sizeof(msgtemp), "%.64s's Race Record's:",account_get_name(account));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Humans: %u-%u",
+		account_get_racewins(account,W3_RACE_HUMANS,clienttag_uint),
+		account_get_racelosses(account,W3_RACE_HUMANS,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+		snprintf(msgtemp, sizeof(msgtemp), "Orcs: %u-%u",
+		account_get_racewins(account,W3_RACE_ORCS,clienttag_uint),
+		account_get_racelosses(account,W3_RACE_ORCS,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+		snprintf(msgtemp, sizeof(msgtemp), "Undead: %u-%u",
+		account_get_racewins(account,W3_RACE_UNDEAD,clienttag_uint),
+		account_get_racelosses(account,W3_RACE_UNDEAD,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Night Elf: %u-%u",
+		account_get_racewins(account,W3_RACE_NIGHTELVES,clienttag_uint),
+		account_get_racelosses(account,W3_RACE_NIGHTELVES,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Random: %u-%u",
+		account_get_racewins(account,W3_RACE_RANDOM,clienttag_uint),
+		account_get_racelosses(account,W3_RACE_RANDOM,clienttag_uint));
+	    message_send_text(c,message_type_info,c,msgtemp);
+	    snprintf(msgtemp, sizeof(msgtemp), "Tournament: %u-%u",
+		account_get_racewins(account,W3_RACE_DEMONS,clienttag_uint),
+		account_get_racelosses(account,W3_RACE_DEMONS,clienttag_uint));
+		    message_send_text(c,message_type_info,c,msgtemp);
 	    return 0;
 	default:
 	    snprintf(msgtemp, sizeof(msgtemp), "%.64s's record:",account_get_name(account));
@@ -2297,15 +2658,17 @@ static int _handle_time_command(t_connection * c, char const *text)
   std::time_t      now;
   struct std::tm * tmnow;
 
+    eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+  
   btsystem = bnettime();
 
   /* Battle.net time: Wed Jun 23 15:15:29 */
   btlocal = bnettime_add_tzbias(btsystem,local_tzbias());
   now = bnettime_to_time(btlocal);
   if (!(tmnow = std::gmtime(&now)))
-    std::strcpy(msgtemp,"PvPGN Server Time: ?");
+    std::strcpy(msgtemp,"EuroBattle.Net Server Time: ?");
   else
-    std::strftime(msgtemp,sizeof(msgtemp),"PvPGN Server Time: %a %b %d %H:%M:%S",tmnow);
+    std::strftime(msgtemp,sizeof(msgtemp),"EuroBattle.Net Server Time: %a %b %d %H:%M:%S",tmnow);
   message_send_text(c,message_type_info,c,msgtemp);
   if (conn_get_class(c)==conn_class_bnet)
     {
@@ -2325,6 +2688,8 @@ static int _handle_channel_command(t_connection * c, char const *text)
  {
    t_channel * channel;
 
+     eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+   
    text = skip_command(text);
 
    if (text[0]=='\0')
@@ -2363,7 +2728,7 @@ static int _handle_channel_command(t_connection * c, char const *text)
 
 static int _handle_rejoin_command(t_connection * c, char const *text)
 {
-
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
   if (channel_rejoin(c)!=0)
       message_send_text(c,message_type_error,c,"You are not in a channel.");
   if ((conn_get_clienttag(c) == CLIENTTAG_WARCRAFT3_UINT) || (conn_get_clienttag(c) ==  CLIENTTAG_WAR3XP_UINT))
@@ -2375,7 +2740,7 @@ static int _handle_rejoin_command(t_connection * c, char const *text)
 
 static int _handle_away_command(t_connection * c, char const *text)
 {
-
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
   text = skip_command(text);
 
   if (text[0]=='\0') /* toggle away mode */
@@ -2402,7 +2767,7 @@ static int _handle_away_command(t_connection * c, char const *text)
 
 static int _handle_dnd_command(t_connection * c, char const *text)
 {
-
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
   text = skip_command(text);
 
   if (text[0]=='\0') /* toggle dnd mode */
@@ -2430,7 +2795,7 @@ static int _handle_dnd_command(t_connection * c, char const *text)
 static int _handle_squelch_command(t_connection * c, char const *text)
 {
   t_account *  account;
-
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
   text = skip_command(text);
 
   /* D2 std::puts * before username */
@@ -2471,6 +2836,8 @@ static int _handle_unsquelch_command(t_connection * c, char const *text)
   t_account * account;
   t_connection * dest_c;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   text = skip_command(text);
 
   /* D2 std::puts * before username */
@@ -2517,6 +2884,8 @@ static int _handle_kick_command(t_connection * c, char const *text)
   t_connection *    kuc;
   t_account *	    acc;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
@@ -2600,6 +2969,8 @@ static int _handle_ban_command(t_connection * c, char const *text)
   t_channel *    channel;
   t_connection * buc;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
@@ -2672,6 +3043,8 @@ static int _handle_unban_command(t_connection * c, char const *text)
   t_channel *  channel;
   unsigned int i;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
 
@@ -2711,6 +3084,8 @@ static int _handle_reply_command(t_connection * c, char const *text)
   unsigned int i;
   char const * dest;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   if (!(dest = conn_get_lastsender(c)))
     {
       message_send_text(c,message_type_error,c,"No one messaged you, use /m instead");
@@ -2738,6 +3113,8 @@ static int _handle_realmann_command(t_connection * c, char const *text)
   t_elem const * curr;
   t_message    * message;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
 
@@ -2778,6 +3155,8 @@ static int _handle_watch_command(t_connection * c, char const *text)
   unsigned int i;
   t_account *  account;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
 
@@ -2808,6 +3187,8 @@ static int _handle_unwatch_command(t_connection * c, char const *text)
    unsigned int i;
    t_account *  account;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);   
+   
    for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
    for (; text[i]==' '; i++);
 
@@ -2838,6 +3219,8 @@ static int _handle_watchall_command(t_connection * c, char const *text)
     t_clienttag clienttag=0;
     char clienttag_str[5];
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     text = skip_command(text);
 
     if(text[0] != '\0') {
@@ -2868,6 +3251,8 @@ static int _handle_unwatchall_command(t_connection * c, char const *text)
     t_clienttag clienttag=0;
     char clienttag_str[5];
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     text = skip_command(text);
 
     if(text[0] != '\0') {
@@ -2899,6 +3284,8 @@ static int _handle_lusers_command(t_connection * c, char const *text)
   char const *   banned;
   unsigned int   i;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   if (!(channel = conn_get_channel(c)))
     {
       message_send_text(c,message_type_error,c,"This command can only be used inside a channel.");
@@ -2951,6 +3338,7 @@ static int _news_cb(std::time_t date, t_lstr *lstr, void *data)
 
 static int _handle_news_command(t_connection * c, char const *text)
 {
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
     news_traverse(_news_cb,c);
     return 0;
 }
@@ -3000,6 +3388,8 @@ static int _handle_games_command(t_connection * c, char const *text)
   char           dest[5];
   struct glist_cb_struct cbdata;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
@@ -3067,6 +3457,7 @@ static int _handle_channels_command(t_connection * c, char const *text)
   char const * name;
   int first;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
 
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
@@ -3141,6 +3532,8 @@ static int _handle_addacct_command(t_connection * c, char const *text)
     char         username[MAX_USERNAME_LEN];
     char         pass[256];
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+
     for (i=0; text[i]!=' ' && text[i]!='\0'; i++);
     for (; text[i]==' '; i++);
 
@@ -3200,6 +3593,8 @@ static int _handle_chpass_command(t_connection * c, char const *text)
   char const * username;
   char *       pass;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++);
   for (; text[i]==' '; i++);
 
@@ -3295,6 +3690,8 @@ static int _handle_connections_command(t_connection *c, char const *text)
   char const *   game_name;
   char           clienttag_str[5];
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   if (!prefs_get_enable_conn_all() && !(account_get_command_groups(conn_get_account(c)) & command_get_group("/admin-con"))) /* default to false */
     {
       message_send_text(c,message_type_error,c,"This command is only enabled for admins.");
@@ -3391,6 +3788,10 @@ static int _handle_finger_command(t_connection * c, char const *text)
   char const *   ip;
   char *         tok;
   t_clanmember * clanmemb;
+  std::time_t      then;
+  struct std::tm * tmthen;
+  
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
 
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
@@ -3410,10 +3811,17 @@ static int _handle_finger_command(t_connection * c, char const *text)
       message_send_text(c,message_type_error,c,"Invalid user.");
       return 0;
     }
+  
+  then = account_get_ll_ctime(account);
+  tmthen = std::localtime(&then); /* FIXME: determine user's timezone */  
+	
   snprintf(msgtemp, sizeof(msgtemp), "Login: %-16.16s "UID_FORMAT" Sex: %.14s",
 	  account_get_name(account),
 	  account_get_uid(account),
 	  account_get_sex(account));
+  message_send_text(c,message_type_info,c,msgtemp);
+
+  std::strftime(msgtemp,sizeof(msgtemp),"Created: %a %b %d %H:%M %Y ",tmthen);
   message_send_text(c,message_type_info,c,msgtemp);
 
   if ((clanmemb = account_get_clanmember(account)))
@@ -3467,8 +3875,6 @@ static int _handle_finger_command(t_connection * c, char const *text)
     ip = "unknown";
 
   {
-    std::time_t      then;
-    struct std::tm * tmthen;
 
     then = account_get_ll_time(account);
     tmthen = std::localtime(&then); /* FIXME: determine user's timezone */
@@ -3492,11 +3898,15 @@ static int _handle_finger_command(t_connection * c, char const *text)
       /* the player who requested /finger has admin privileges
          give him more info about the one he querys;
          is_admin, is_operator, is_locked, email */
-         snprintf(msgtemp, sizeof(msgtemp), "email:%.128s , is_operator: %d , is_admin: %d , is_acc_locked: %d",
+         snprintf(msgtemp, sizeof(msgtemp), "Email: %.128s , Operator: %d , Admin: %d , Locked: %d , Muted: %d , Ladder: %d",
          account_get_email(account),
          account_get_auth_operator(account,NULL),
          account_get_auth_admin(account,NULL),
-         account_get_auth_lock(account));
+         account_get_auth_lock(account),
+		 account_get_auth_mute(account),account_get_auth_ladderban(account));
+         message_send_text(c,message_type_info,c,msgtemp);		 
+		 snprintf(msgtemp, sizeof(msgtemp), "Last login Owner: %.128s",
+         account_get_ll_owner(account));
          message_send_text(c,message_type_info,c,msgtemp);
   }
 
@@ -3543,6 +3953,45 @@ static int _handle_operator_command(t_connection * c, char const *text)
 */
 
 /* FIXME: do we want to show just Server Admin or Channel Admin Also? [Omega] */
+
+static int _handle_operators_command(t_connection * c, char const *text)
+{
+  unsigned int    i;
+  t_elem const *  curr;
+  t_connection *  tc;
+  char const *    nick;
+
+	eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+
+  std::strcpy(msgtemp,"Currently logged on Operators:");
+  i = std::strlen(msgtemp);
+  LIST_TRAVERSE_CONST(connlist(),curr)
+    {
+      tc = (t_connection*)elem_get_data(curr);
+      if (!tc)
+	continue;
+      if (!conn_get_account(tc))
+         continue;
+      if (account_get_auth_operator(conn_get_account(tc),NULL)==1)
+	{
+	  if ((nick = conn_get_username(tc)))
+	    {
+	      if (i+std::strlen(nick)+2>sizeof(msgtemp)) /* " ", name, '\0' */
+		{
+		  message_send_text(c,message_type_info,c,msgtemp);
+		  i = 0;
+    }
+	      std::sprintf(&msgtemp[i]," %s", nick);
+	      i += std::strlen(&msgtemp[i]);
+	    }
+	}
+    }
+  if (i>0)
+  message_send_text(c,message_type_info,c,msgtemp);
+
+  return 0;
+}
+
 static int _handle_admins_command(t_connection * c, char const *text)
 {
   unsigned int    i;
@@ -3550,6 +3999,8 @@ static int _handle_admins_command(t_connection * c, char const *text)
   t_connection *  tc;
   char const *    nick;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   std::strcpy(msgtemp,"Currently logged on Administrators:");
   i = std::strlen(msgtemp);
   LIST_TRAVERSE_CONST(connlist(),curr)
@@ -3581,6 +4032,9 @@ static int _handle_admins_command(t_connection * c, char const *text)
 
 static int _handle_quit_command(t_connection * c, char const *text)
 {
+
+	  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+
     if (conn_get_game(c))
 	eventlog(eventlog_level_warn, __FUNCTION__,"[%d] user '%s' tried to disconnect while in game, cheat attempt ?", conn_get_socket(c), conn_get_loggeduser(c));
     else {
@@ -3597,6 +4051,8 @@ static int _handle_kill_command(t_connection * c, char const *text)
   t_connection *	user;
   char		usrnick[MAX_USERNAME_LEN]; /* max length of nick + \0 */  /* FIXME: Is it somewhere defined? */
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get nick */
@@ -3642,6 +4098,8 @@ static int _handle_killsession_command(t_connection * c, char const *text)
   t_connection *	user;
   char		session[16];
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get nick */
@@ -3681,6 +4139,8 @@ static int _handle_gameinfo_command(t_connection * c, char const *text)
   t_game const * game;
   char clienttag_str[5];
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
 
@@ -3818,6 +4278,7 @@ static int _handle_gameinfo_command(t_connection * c, char const *text)
 
 static int _handle_ladderactivate_command(t_connection * c, char const *text)
 {
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
   ladders.activate();
   message_send_text(c,message_type_info,c,"Copied current scores to active scores on all ladders.");
   return 0;
@@ -3825,6 +4286,7 @@ static int _handle_ladderactivate_command(t_connection * c, char const *text)
 
 static int _handle_rehash_command(t_connection * c, char const *text)
 {
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
   server_restart_wraper();
   return 0;
 }
@@ -3844,6 +4306,8 @@ static int _handle_shutdown_command(t_connection * c, char const *text)
   unsigned int i,j;
   unsigned int delay;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
@@ -3881,6 +4345,8 @@ static int _handle_ladderinfo_command(t_connection * c, char const *text)
   const LadderReferencedObject* referencedObject;
   LadderList* ladderList;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   text = skip_command(text);
   for (i=0,j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
     if (j<sizeof(dest)-1) dest[j++] = text[i];
@@ -4128,6 +4594,8 @@ static int _handle_timer_command(t_connection * c, char const *text)
   char         deltastr[64];
   t_timer_data data;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get comm */
@@ -4173,6 +4641,8 @@ static int _handle_serverban_command(t_connection *c, char const *text)
   t_connection * dest_c;
   unsigned int i,j;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); // skip command
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) // get dest
@@ -4216,6 +4686,8 @@ static int _handle_netinfo_command(t_connection * c, char const *text)
   unsigned int   taddr;
   unsigned short tport;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); // skip command
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) // get dest
@@ -4281,6 +4753,9 @@ static int _handle_netinfo_command(t_connection * c, char const *text)
 
 static int _handle_quota_command(t_connection * c, char const * text)
 {
+
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+
   snprintf(msgtemp, sizeof(msgtemp), "Your quota allows you to write %u lines per %u seconds.",prefs_get_quota_lines(),prefs_get_quota_time());
   message_send_text(c,message_type_info,c,msgtemp);
   snprintf(msgtemp, sizeof(msgtemp), "Long lines will be considered to wrap every %u characters.",prefs_get_quota_wrapline());
@@ -4296,6 +4771,8 @@ static int _handle_lockacct_command(t_connection * c, char const *text)
   t_connection * user;
   t_account *    account;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   text = skip_command(text);
 
   if (text[0]=='\0')
@@ -4322,6 +4799,8 @@ static int _handle_unlockacct_command(t_connection * c, char const *text)
   t_connection * user;
   t_account *    account;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   text = skip_command(text);
 
   if (text[0]=='\0')
@@ -4349,6 +4828,8 @@ static int _handle_muteacct_command(t_connection * c, char const *text)
   t_connection * user;
   t_account *    account;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   text = skip_command(text);
 
   if (text[0]=='\0')
@@ -4375,6 +4856,8 @@ static int _handle_unmuteacct_command(t_connection * c, char const *text)
   t_connection * user;
   t_account *    account;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   text = skip_command(text);
 
   if (text[0]=='\0')
@@ -4396,12 +4879,70 @@ static int _handle_unmuteacct_command(t_connection * c, char const *text)
   return 0;
 }
 
+static int _handle_ladderban_command(t_connection * c, char const *text)
+{
+  t_connection * user;
+  t_account *    account;
+
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
+  text = skip_command(text);
+
+  if (text[0]=='\0')
+    {
+      message_send_text(c,message_type_info,c,"usage: /ladderban <username>");
+      return 0;
+    }
+
+  if (!(account = accountlist_find_account(text)))
+    {
+      message_send_text(c,message_type_error,c,"Invalid user.");
+      return 0;
+    }
+  if ((user = connlist_find_connection_by_accountname(text)))
+    message_send_text(user,message_type_info,user,"Your accound has just been banned from ladder by admin.");
+
+  account_set_auth_ladderban(account,1);
+  message_send_text(c,message_type_error,c,"That user account is now banned from ladder.");
+  return 0;
+}
+
+static int _handle_ladderunban_command(t_connection * c, char const *text)
+{
+  t_connection * user;
+  t_account *    account;
+
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
+  text = skip_command(text);
+
+  if (text[0]=='\0')
+    {
+      message_send_text(c,message_type_info,c,"usage: /ladderunban <username>");
+      return 0;
+    }
+  if (!(account = accountlist_find_account(text)))
+    {
+      message_send_text(c,message_type_error,c,"Invalid user.");
+      return 0;
+    }
+
+  if ((user = connlist_find_connection_by_accountname(text)))
+    message_send_text(user,message_type_info,user,"Your accound has just been unbanned from ladder by admin.");
+
+  account_set_auth_ladderban(account,0);
+  message_send_text(c,message_type_error,c,"That user account is now unbanned from ladder.");
+  return 0;
+}
+
 static int _handle_flag_command(t_connection * c, char const *text)
 {
   char         dest[32];
   unsigned int i,j;
   unsigned int newflag;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
   for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
@@ -4429,6 +4970,8 @@ static int _handle_tag_command(t_connection * c, char const *text)
     unsigned int i,j;
     unsigned int newtag;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
     for (; text[i]==' '; i++);
     for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get dest */
@@ -4471,6 +5014,8 @@ static int _handle_ipscan_command(t_connection * c, char const * text)
     t_connection * conn;
     char const * ip;
 
+	eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     /*
       Description of _handle_ipscan_command
       ---------------------------------------
@@ -4525,6 +5070,255 @@ static int _handle_ipscan_command(t_connection * c, char const * text)
     return 0;
 }
 
+static int _handle_seticon_command(t_connection * c, char const *text)
+{
+    t_account *	account;
+    char *	command;
+    char *	username;
+	char *  icon;
+    char 	t[MAX_MESSAGE_LEN];
+    unsigned int i,j;
+    int correctIconName;
+	char	arg1[256];
+    char	arg2[256];
+    char	arg3[256];
+
+char *iconList[]={"fist-blue","fist-red","fist-white","trophy-yellow","bomb","tier1-human","tier1-nightelf","tier1-orc","tier1-undead","tier2-human","tier2-nightelf","tier2-orc","tier2-random","tier2-undead","tier3-human","tier3-nightelf","tier3-orc","tier3-random","tier3-undead","tier4-human","tier4-nightelf","tier4-orc","tier4-random","tier4-undead","tier5-human","tier5-nightelf","tier5-orc","tier5-random","tier5-undead","aura-arcane","aura-fire","aura-ice","aura-lightning","aura-nature","aura-victory","aura-water","dota-axe","dota-balanar","dota-barathrum","dota-batrider","dota-bone","dota-cryxalis","dota-davion","dota-enigma","dota-gyrocopter","dota-invoker_frost","dota-jakiro","dota-kunkka","dota-lanaya","dota-leshrac","dota-lycan","dota-mepo","dota-mirana","dota-morphling","dota-panda","dota-phoenix","dota-pudge","dota-pugna","dota-rikimaru","dota-rooftrellen","dota-shadowfiend","dota-spectre","dota-stormspirit","dota-sven","dota-techies","dota-tidehunter","dota-tiny","dota-troll","dota-venomancer","dota-viper","dota-void","dota-warlock","dota-zeus","helmet-diamond","helmet-gold","helmet-huntress","helmet-red","helmet-jade","helmet-silver","orb-arcane","orb-dark","orb-elemental","orb-fire","orb-gold","orb-lightning","orb-magic","orb-nature","orb-water","pg-captain","pg-goldhand","pg-humanarcher","pg-lichking","pg-mushroom","pg-panda","pg-siegegolem","pg-stonegiant","pg-wargolem","potion-acid","potion-arcane","potion-blood","potion-health","potion-ice","potion-light","potion-moonglade","potion-nature","potion-venom","potion-water","shield-arcane","shield-fire","shield-forest","shield-green","shield-ice","shield-warsong","shield-water","special-angel","special-boots","special-cup","special-fable","special-frog","special-king","special-moonie","special-norris","special-phoenix","special-quiz","special-quiz_master","special-topladder","sword-blue","sword-green","sword-purple","sword-red","sword-yellow","wand-arcane","wand-dark","wand-fire","wand-ice","wand-lightning","wand-moonlight",NULL};
+char *codeList[]={"ULBF","DERF","IHWF","LEYT","BMOB","MUH1","FLE1","CRO1","DNU1","MUH2","FLE2","CRO2","DNR2","DNU2","MUH3","FLE3","CRO3","DNR3","DNU3","MUH4","FLE4","CRO4","DNR4","DNU4","MUH5","FLE5","CRO5","DNR5","DNU5","RAUA","IFUA","CIUA","ILUA","ANUA","IVUA","AWUA","XAOD","ABOD","RBOD","TBOD","OBOD","RCOD","ADOD","NEOD","YGOD","NIOD","AJOD","UKOD","ALOD","ELOD","YLOD","EMOD","IMOD","OMOD","APOD","HPOD","UPOD","GPOD","IROD","OROD","HSOD","PSOD","TSOD","VSOD","ETOD","ITOD","NTOD","RTOD","EVOD","IVOD","OVOD","AWOD","EZOD","IDEH","OGEH","UHEH","EREH","AJEH","ISEH","RARO","ADRO","LERO","IFRO","OGRO","ILRO","AMRO","ANRO","AWRO","ACGP","OGGP","UHGP","ILGP","UMGP","APGP","ISGP","TSGP","AWGP","CAOP","RAOP","LBOP","EHOP","CIOP","ILOP","OMOP","ANOP","EVOP","AWOP","RAHS","IFHS","OFHS","RGHS","CIHS","AWHS","TWHS","NAPS","OBPS","UCPS","AFPS","RFPS","IKPS","OMPS","ONPS","HPPS","UQPS","MQPS","OTPS","LBWS","RGWS","UPWS","ERWS","EYWS","RAAW","ADAW","IFAW","CIAW","ILAW","OMAW",NULL};
+char *descriptionList[] = {"fist-blue (Blue Midas)","fist-red (Red Midas)","fist-white (White Midas)","trophy-yellow (KIFT)","bomb","tier1-human (Peasant)","tier1-nightelf (Wisp)","tier1-orc (Peon)","tier1-undead (Acolyte)","tier2-human (Footman)","tier2-nightelf (Archer)","tier2-orc (Grunt)","tier2-random (Green Dragon Whelp)","tier2-undead (Ghoul)","tier3-human (Knight)","tier3-nightelf (Druid of the Claw)","tier3-orc (Tauren)","tier3-random (Blue Dragon)","tier3-undead (Abomination)","tier4-human (Archmage)","tier4-nightelf (Priestess of the Moon)","tier4-orc (Far Seer)","tier4-random (Red Dragon)","tier4-undead (Lich)","tier5-human (Medivh)","tier5-nightelf (Furion Stormrage)","tier5-orc (Thrall)","tier5-random (Deathwing)","tier5-undead (Tichondrius)","aura-arcane","aura-fire","aura-ice","aura-lightning","aura-nature","aura-victory","aura-water","dota-axe","dota-balanar","dota-barathrum","dota-batrider","dota-bone","dota-cryxalis","dota-davion","dota-enigma","dota-gyrocopter","dota-invoker_frost","dota-jakiro","dota-kunkka","dota-lanaya","dota-leshrac","dota-lycan","dota-mepo","dota-mirana","dota-morphling","dota-panda","dota-phoenix","dota-pudge","dota-pugna","dota-rikimaru","dota-rooftrellen","dota-shadowfiend","dota-spectre","dota-stormspirit","dota-sven","dota-techies","dota-tidehunter","dota-tiny","dota-troll","dota-venomancer","dota-viper","dota-void","dota-warlock","dota-zeus","helmet-diamond","helmet-gold","helmet-huntress","helmet-red","helmet-jade","helmet-silver","orb-arcane","orb-dark","orb-elemental","orb-fire","orb-gold","orb-lightning","orb-magic","orb-nature","orb-water","pg-captain","pg-goldhand","pg-humanarcher","pg-lichking","pg-mushroom","pg-panda","pg-siegegolem","pg-stonegiant","pg-wargolem","potion-acid","potion-arcane","potion-blood","potion-health","potion-ice","potion-light","potion-moonglade","potion-nature","potion-venom","potion-water","shield-arcane","shield-fire","shield-forest","shield-green","shield-ice","shield-warsong","shield-water","special-angel","special-boots","special-cup","special-fable","special-frog","special-king","special-moonie","special-norris","special-phoenix","special-quiz","special-quiz_master","special-topladder","sword-blue","sword-green","sword-purple","sword-red","sword-yellow","wand-arcane","wand-dark","wand-fire","wand-ice","wand-lightning","wand-moonlight",NULL};
+	
+	eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+
+    std::strncpy(t, text, MAX_MESSAGE_LEN - 1);
+    for (i=0; t[i]!=' ' && t[i]!='\0'; i++); /* skip command /groups */
+
+    for (; t[i]==' '; i++); /* skip spaces */
+    for (j=0; t[i]!=' ' && t[i]!='\0'; i++) /* get command */
+	if (j<sizeof(arg1)-1) arg1[j++] = t[i];
+    arg1[j] = '\0';
+
+    for (; t[i]==' '; i++); /* skip spaces */
+    for (j=0; t[i]!=' ' && t[i]!='\0'; i++) /* get username */
+	if (j<sizeof(arg2)-1) arg2[j++] = t[i];
+    arg2[j] = '\0';
+
+    for (; t[i]==' '; i++); /* skip spaces */
+    for (j=0; t[i]!='\0'; i++) /* get icon */
+	if (j<sizeof(arg3)-1) arg3[j++] = t[i];
+    arg3[j] = '\0';
+
+    command = arg1;
+    username = arg2;
+	icon = arg3;
+	
+    for (i=0; i<std::strlen(icon); i++)
+	if (std::isupper((int)icon[i])) icon[i] = std::tolower((int)icon[i]);
+	
+    if (arg1[0] =='\0') {
+	message_send_text(c,message_type_info,c,"usage: /seticon <command> <username> <icon code>");
+	return 0;
+    }
+
+    if (!std::strcmp(command,"help") || !std::strcmp(command,"h")) {
+	message_send_text(c,message_type_info,c,"Set icons (Setting custom icons for users).");
+	message_send_text(c,message_type_info,c,"Type: /seticon add <username> <icon code> - add an icon to user profile");
+	message_send_text(c,message_type_info,c,"Type: /seticon del <username> <icon code> - delete an icon from user profile");
+	message_send_text(c,message_type_info,c,"Type: /seticon list <username> - shows current icons user can use");
+	return 0;
+    }
+
+    if (arg2[0] =='\0') {
+	message_send_text(c,message_type_info,c,"usage: /seticon <command> <username> <icon code>");
+	return 0;
+    }
+
+    if (!(account = accountlist_find_account(username))) {
+	message_send_text(c,message_type_error,c,"Invalid user.");
+	return 0;
+    }
+
+	if (!std::strcmp(command,"list") || !std::strcmp(command,"l")) {
+		
+		message_send_text(c,message_type_info,c,"Icon Name: Icon Code , Attribute");
+		message_send_text(c,message_type_info,c,"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");	
+		
+		
+		for (i=0 ; iconList[i] != NULL ; i++)
+		{			
+			snprintf(msgtemp, sizeof(msgtemp), "%s , %d",descriptionList[i],account_get_auth_icon(account,iconList[i]));
+			message_send_text(c,message_type_info,c,msgtemp);
+		}		
+		message_send_text(c,message_type_info,c,"Note: Hammer and Ladder icons are not displayed on this list.");
+	return 0;
+    }
+	
+	if (arg3[0] =='\0') {
+	message_send_text(c,message_type_info,c,"usage: /seticon <command> <username> <icon code>");
+	return 0;
+    }	
+	
+	correctIconName = 0;
+	
+	for (i=0 ; iconList[i] != NULL ; i++)
+	{
+		if (!std::strcmp(icon,iconList[i]))
+		{
+			correctIconName = 1;
+			break;
+		}
+	}
+	
+	if (correctIconName == 0)
+	{
+		eventlog(eventlog_level_info,__FUNCTION__,"unknown icon: %x", text);
+		snprintf(msgtemp, sizeof(msgtemp), "No such icon, unable to set!");
+		message_send_text(c,message_type_error,c,msgtemp);
+		return 0;
+	}
+		
+	if (!std::strcmp(command,"add") || !std::strcmp(command,"a")) {
+	account_set_auth_icon(account, icon, 1);
+	snprintf(msgtemp, sizeof(msgtemp) ,"%.128s is setted to the requested account.", icon);
+	message_send_text(c,message_type_info,c,msgtemp);
+	return 0;
+    }
+
+    if (!std::strcmp(command,"del") || !std::strcmp(command,"d")) {
+	account_set_auth_icon(account, icon, 0);
+	account_set_user_icon(account,CLIENTTAG_WAR3XP_UINT,""); //most likely that user got that special icon on his profile
+	snprintf(msgtemp, sizeof(msgtemp) ,"%.128s is removed from the requested account.", icon);
+	message_send_text(c,message_type_info,c,msgtemp);
+	return 0;
+    }
+
+    snprintf(msgtemp, sizeof(msgtemp), "got unknown command: %.128s", command);
+    message_send_text(c,message_type_error,c,msgtemp);
+    return 0;
+
+}
+
+static int _handle_swapicon_command(t_connection * c, char const *text)
+{
+  
+  t_account *   account;
+  t_clienttag 	clienttag;
+  char const 	*user_icon;
+  unsigned int i,j;
+  char	arg1[256];
+  char *	icon;
+  
+char *iconList[]={"fist-blue","fist-red","fist-white","trophy-yellow","bomb","tier1-human","tier1-nightelf","tier1-orc","tier1-undead","tier2-human","tier2-nightelf","tier2-orc","tier2-random","tier2-undead","tier3-human","tier3-nightelf","tier3-orc","tier3-random","tier3-undead","tier4-human","tier4-nightelf","tier4-orc","tier4-random","tier4-undead","tier5-human","tier5-nightelf","tier5-orc","tier5-random","tier5-undead","aura-arcane","aura-fire","aura-ice","aura-lightning","aura-nature","aura-victory","aura-water","dota-axe","dota-balanar","dota-barathrum","dota-batrider","dota-bone","dota-cryxalis","dota-davion","dota-enigma","dota-gyrocopter","dota-invoker_frost","dota-jakiro","dota-kunkka","dota-lanaya","dota-leshrac","dota-lycan","dota-mepo","dota-mirana","dota-morphling","dota-panda","dota-phoenix","dota-pudge","dota-pugna","dota-rikimaru","dota-rooftrellen","dota-shadowfiend","dota-spectre","dota-stormspirit","dota-sven","dota-techies","dota-tidehunter","dota-tiny","dota-troll","dota-venomancer","dota-viper","dota-void","dota-warlock","dota-zeus","helmet-diamond","helmet-gold","helmet-huntress","helmet-red","helmet-jade","helmet-silver","orb-arcane","orb-dark","orb-elemental","orb-fire","orb-gold","orb-lightning","orb-magic","orb-nature","orb-water","pg-captain","pg-goldhand","pg-humanarcher","pg-lichking","pg-mushroom","pg-panda","pg-siegegolem","pg-stonegiant","pg-wargolem","potion-acid","potion-arcane","potion-blood","potion-health","potion-ice","potion-light","potion-moonglade","potion-nature","potion-venom","potion-water","shield-arcane","shield-fire","shield-forest","shield-green","shield-ice","shield-warsong","shield-water","special-angel","special-boots","special-cup","special-fable","special-frog","special-king","special-moonie","special-norris","special-phoenix","special-quiz","special-quiz_master","special-topladder","sword-blue","sword-green","sword-purple","sword-red","sword-yellow","wand-arcane","wand-dark","wand-fire","wand-ice","wand-lightning","wand-moonlight",NULL};
+char *codeList[]={"ULBF","DERF","IHWF","LEYT","BMOB","MUH1","FLE1","CRO1","DNU1","MUH2","FLE2","CRO2","DNR2","DNU2","MUH3","FLE3","CRO3","DNR3","DNU3","MUH4","FLE4","CRO4","DNR4","DNU4","MUH5","FLE5","CRO5","DNR5","DNU5","RAUA","IFUA","CIUA","ILUA","ANUA","IVUA","AWUA","XAOD","ABOD","RBOD","TBOD","OBOD","RCOD","ADOD","NEOD","YGOD","NIOD","AJOD","UKOD","ALOD","ELOD","YLOD","EMOD","IMOD","OMOD","APOD","HPOD","UPOD","GPOD","IROD","OROD","HSOD","PSOD","TSOD","VSOD","ETOD","ITOD","NTOD","RTOD","EVOD","IVOD","OVOD","AWOD","EZOD","IDEH","OGEH","UHEH","EREH","AJEH","ISEH","RARO","ADRO","LERO","IFRO","OGRO","ILRO","AMRO","ANRO","AWRO","ACGP","OGGP","UHGP","ILGP","UMGP","APGP","ISGP","TSGP","AWGP","CAOP","RAOP","LBOP","EHOP","CIOP","ILOP","OMOP","ANOP","EVOP","AWOP","RAHS","IFHS","OFHS","RGHS","CIHS","AWHS","TWHS","NAPS","OBPS","UCPS","AFPS","RFPS","IKPS","OMPS","ONPS","HPPS","UQPS","MQPS","OTPS","LBWS","RGWS","UPWS","ERWS","EYWS","RAAW","ADAW","IFAW","CIAW","ILAW","OMAW",NULL};
+char *descriptionList[] = {"fist-blue (Blue Midas)","fist-red (Red Midas)","fist-white (White Midas)","trophy-yellow (KIFT)","bomb","tier1-human (Peasant)","tier1-nightelf (Wisp)","tier1-orc (Peon)","tier1-undead (Acolyte)","tier2-human (Footman)","tier2-nightelf (Archer)","tier2-orc (Grunt)","tier2-random (Green Dragon Whelp)","tier2-undead (Ghoul)","tier3-human (Knight)","tier3-nightelf (Druid of the Claw)","tier3-orc (Tauren)","tier3-random (Blue Dragon)","tier3-undead (Abomination)","tier4-human (Archmage)","tier4-nightelf (Priestess of the Moon)","tier4-orc (Far Seer)","tier4-random (Red Dragon)","tier4-undead (Lich)","tier5-human (Medivh)","tier5-nightelf (Furion Stormrage)","tier5-orc (Thrall)","tier5-random (Deathwing)","tier5-undead (Tichondrius)","aura-arcane","aura-fire","aura-ice","aura-lightning","aura-nature","aura-victory","aura-water","dota-axe","dota-balanar","dota-barathrum","dota-batrider","dota-bone","dota-cryxalis","dota-davion","dota-enigma","dota-gyrocopter","dota-invoker_frost","dota-jakiro","dota-kunkka","dota-lanaya","dota-leshrac","dota-lycan","dota-mepo","dota-mirana","dota-morphling","dota-panda","dota-phoenix","dota-pudge","dota-pugna","dota-rikimaru","dota-rooftrellen","dota-shadowfiend","dota-spectre","dota-stormspirit","dota-sven","dota-techies","dota-tidehunter","dota-tiny","dota-troll","dota-venomancer","dota-viper","dota-void","dota-warlock","dota-zeus","helmet-diamond","helmet-gold","helmet-huntress","helmet-red","helmet-jade","helmet-silver","orb-arcane","orb-dark","orb-elemental","orb-fire","orb-gold","orb-lightning","orb-magic","orb-nature","orb-water","pg-captain","pg-goldhand","pg-humanarcher","pg-lichking","pg-mushroom","pg-panda","pg-siegegolem","pg-stonegiant","pg-wargolem","potion-acid","potion-arcane","potion-blood","potion-health","potion-ice","potion-light","potion-moonglade","potion-nature","potion-venom","potion-water","shield-arcane","shield-fire","shield-forest","shield-green","shield-ice","shield-warsong","shield-water","special-angel","special-boots","special-cup","special-fable","special-frog","special-king","special-moonie","special-norris","special-phoenix","special-quiz","special-quiz_master","special-topladder","sword-blue","sword-green","sword-purple","sword-red","sword-yellow","wand-arcane","wand-dark","wand-fire","wand-ice","wand-lightning","wand-moonlight",NULL};
+
+	
+	eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+
+  account = conn_get_account(c);
+  clienttag = conn_get_clienttag(c);
+  user_icon = "XXXX";
+  
+  for (i=0; text[i]!=' ' && text[i]!='\0'; i++);
+  for (; text[i]==' '; i++);
+
+  for (j=0; text[i]!=' ' && text[i]!='\0'; i++) /* get icon */
+  if (j<sizeof(arg1)-1) arg1[j++] = text[i];
+  arg1[j] = '\0';
+  
+  icon = arg1;
+  
+    if (arg1[0] =='\0') {
+	message_send_text(c,message_type_info,c,"usage: /icon <icon code>");
+	message_send_text(c,message_type_info,c,"Available icons:");
+
+		message_send_text(c,message_type_info,c,"Icon Code (Icon Name)  ");
+		message_send_text(c,message_type_info,c,"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
+		
+		for (i=0 ; iconList[i] != NULL ; i++)
+		{
+			if (account_get_auth_icon(account,iconList[i]) == 1) message_send_text(c,message_type_info,c, descriptionList[i]);
+		}
+		if (account_get_command_groups(account) >  1) message_send_text(c,message_type_info,c, "Hammer (Hammer)");
+		message_send_text(c,message_type_info,c,"Ladder - In case you have reached the top 100 in Solo or Team");
+	return 0;
+    }
+	
+    for (i=0; i<std::strlen(icon); i++)
+	if (std::isupper((int)icon[i])) icon[i] = std::tolower((int)icon[i]);
+	
+	/*Checking if icon exist and applying his code to user_icon value.*/
+  	
+	for (i=0 ; iconList[i] != NULL ; i++)
+	{
+		if (!std::strcmp(icon,iconList[i]))	user_icon=codeList[i];
+	}
+	
+	if (!std::strcmp(icon,"hammer"))
+	{
+				/* special hammer icon for all crew members */
+		if (account_get_command_groups(account) >  1)
+     	{
+		user_icon="MMAH";			
+		account_set_user_icon(account,clienttag,user_icon);
+		conn_update_w3_playerinfo(c);
+		channel_rejoin(c);
+		return 0;
+		}
+		else {
+			snprintf(msgtemp, sizeof(msgtemp), "You must be a EuroBattle.Net crew member to set this icon!");
+			message_send_text(c,message_type_error,c,msgtemp);	
+			return 0;		
+			}	
+	}
+	if (!std::strcmp(icon,"ladder"))
+	{
+				/* all solo and team rank special icons */
+		if ((account_get_ladder_rank2(account, clienttag, "Solo") < 11) & (account_get_ladder_rank2(account, clienttag, "Solo") != 0))
+			user_icon="DERW"; 
+		else if ((account_get_ladder_rank2(account, clienttag, "Team") < 11) & (account_get_ladder_rank2(account, clienttag, "Team") != 0))
+			user_icon="NRGW";
+		else if ((account_get_ladder_rank2(account, clienttag, "Solo") < 31) & (account_get_ladder_rank2(account, clienttag, "Solo") != 0))
+			user_icon="DLGW";
+		else if ((account_get_ladder_rank2(account, clienttag, "Team") < 31) & (account_get_ladder_rank2(account, clienttag, "Team") != 0))
+			user_icon="2LGW";
+		else if ((account_get_ladder_rank2(account, clienttag, "Solo") < 101) & (account_get_ladder_rank2(account, clienttag, "Solo") != 0))
+			user_icon="RUPW";
+		else if ((account_get_ladder_rank2(account, clienttag, "Team") < 101) & (account_get_ladder_rank2(account, clienttag, "Team") != 0))
+			user_icon="DNIW";
+		else {
+			snprintf(msgtemp, sizeof(msgtemp), "You must reach the top 100 in Solo or Team ladder games for setting this icon!");
+			message_send_text(c,message_type_error,c,msgtemp);	
+			return 0;
+			}
+	
+		account_set_user_icon(account,clienttag,user_icon);
+		conn_update_w3_playerinfo(c);
+		channel_rejoin(c);		
+		return 0;
+	}
+	if (!std::strcmp(user_icon,"XXXX"))
+	{
+		eventlog(eventlog_level_info,__FUNCTION__,"unknown icon: %x", icon);
+		snprintf(msgtemp, sizeof(msgtemp), "No such icon. type /icon to see available icons.");
+		message_send_text(c,message_type_error,c,msgtemp);
+		return 0;
+	}
+	
+		if (account_get_auth_icon(account,icon) == 1)
+		{
+			account_set_user_icon(account,clienttag,user_icon);
+			conn_update_w3_playerinfo(c);
+			channel_rejoin(c);
+		}
+		else
+		{
+			snprintf(msgtemp, sizeof(msgtemp), "The following icon is not available for your account.");
+			message_send_text(c,message_type_error,c,msgtemp);	
+		}
+	
+  return 0;
+}
+
 static int _handle_set_command(t_connection * c, char const *text)
 {
   t_account * account;
@@ -4537,6 +5331,8 @@ static int _handle_set_command(t_connection * c, char const *text)
   char         arg2[256];
   char         arg3[256];
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   std::strncpy(t, text, MAX_MESSAGE_LEN - 1);
   for (i=0; t[i]!=' ' && t[i]!='\0'; i++); /* skip command /set */
 
@@ -4622,6 +5418,8 @@ static int _handle_tos_command(t_connection * c, char const * text)
   char * filename=NULL;
   std::FILE * fp;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   filename = buildpath(prefs_get_filedir(),prefs_get_tosfile());
 
   /* FIXME: if user enters relative path to tos file in config,
@@ -4679,6 +5477,8 @@ static int _handle_ping_command(t_connection * c, char const *text)
   t_connection *	user;
   t_game 	*	game;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
   for (; text[i]==' '; i++);
 
@@ -4686,6 +5486,7 @@ static int _handle_ping_command(t_connection * c, char const *text)
     {
       if ((game=conn_get_game(c)))
 	{
+	  _handle_time_command(c,text);
 	  for (i=0; i<game_get_count(game); i++)
 	    {
 	      if ((user = game_get_player_conn(game, i)))
@@ -4729,6 +5530,8 @@ static int _handle_commandgroups_command(t_connection * c, char const * text)
     char	arg2[256];
     char	arg3[256];
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     std::strncpy(t, text, MAX_MESSAGE_LEN - 1);
     for (i=0; t[i]!=' ' && t[i]!='\0'; i++); /* skip command /groups */
 
@@ -4838,6 +5641,8 @@ static int _handle_topic_command(t_connection * c, char const * text)
   t_channel * channel;
   int  do_save = NO_SAVE_TOPIC;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);
+  
   channel_name = skip_command(text);
 
   if ((topic = std::strchr(channel_name,'"')))
@@ -4922,6 +5727,8 @@ static int _handle_moderate_command(t_connection * c, char const * text)
   unsigned oldflags;
   t_channel * channel;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);  
+  
   if (!(channel = conn_get_channel(c))) {
     message_send_text(c,message_type_error,c,"This command can only be used inside a channel.");
     return -1;
@@ -5093,6 +5900,8 @@ static int _handle_clearstats_command(t_connection *c, char const *text)
     t_account *  account;
     t_clienttag  ctag = 0;
 
+  eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
+	
     for (i=0; text[i]!=' ' && text[i]!='\0'; i++); /* skip command */
     for (; text[i]==' '; i++);
 

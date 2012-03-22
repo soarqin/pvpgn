@@ -142,7 +142,7 @@ FDWKqueueBackend::del(int idx)
 		{
 			int oidx;
 
-			oidx = (int)(kqchanges[nochanges].udata);
+			oidx = (unsigned long)(kqchanges[nochanges].udata);
 			if (kqchanges[nochanges].filter == EVFILT_READ &&
 			    rridx[oidx] == nochanges)
 			{
@@ -171,7 +171,7 @@ FDWKqueueBackend::del(int idx)
 		{
 			int oidx;
 
-			oidx = (int)(kqchanges[nochanges].udata);
+			oidx = (unsigned long)(kqchanges[nochanges].udata);
 			if (kqchanges[nochanges].filter == EVFILT_READ &&
 			    rridx[oidx] == nochanges)
 			{
@@ -216,7 +216,7 @@ FDWKqueueBackend::handle()
 	for (unsigned i = 0; i < sr; i++)
 	{
 /*      eventlog(eventlog_level_trace, __FUNCTION__, "checking %d ident: %d read: %d write: %d", i, kqevents[i].ident, kqevents[i].filter & EVFILT_READ, kqevents[i].filter & EVFILT_WRITE); */
-		t_fdwatch_fd *cfd = fdw_fds + (int)kqevents[i].udata;
+		t_fdwatch_fd *cfd = fdw_fds + (unsigned long)kqevents[i].udata;
 		if (fdw_rw(cfd) & fdwatch_type_read && kqevents[i].filter == EVFILT_READ)
 			if (fdw_hnd(cfd) (fdw_data(cfd), fdwatch_type_read) == -2)
 				continue;
