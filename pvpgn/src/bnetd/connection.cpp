@@ -110,7 +110,7 @@ static void conn_send_welcome(t_connection * c)
 	t_clienttag clienttag;
 	t_account *   account;
     std::FILE *       fp;
-	char *codeList[] = {"DERW","NRGW","DLGW","2LGW","RUPW","DNIW",NULL}; //all ladder icons
+	const char *codeList[] = {"DERW","NRGW","DLGW","2LGW","RUPW","DNIW",NULL}; //all ladder icons
 	int i;
 	int checkLadderIcon;
 
