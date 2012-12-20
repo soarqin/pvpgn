@@ -106,7 +106,13 @@ static void connarray_del_conn(unsigned index);
 static void conn_send_welcome(t_connection * c)
 {
     char const * filename;
+	char const * usericon;
+	t_clienttag clienttag;
+	t_account *   account;
     std::FILE *       fp;
+	const char *codeList[] = {"DERW","NRGW","DLGW","2LGW","RUPW","DNIW",NULL}; //all ladder icons
+	int i;
+	int checkLadderIcon;
 
     if (!c)
     {
@@ -183,6 +189,48 @@ static void conn_send_welcome(t_connection * c)
             xfree((void *)lang_filename);
     }
     c->protocol.cflags|= conn_flags_welcomed;
+	
+	checkLadderIcon = 0;
+	clienttag = conn_get_clienttag(c);
+	account = conn_get_account(c);
+	usericon = account_get_user_icon(account,clienttag);
+	
+	if (usericon != NULL)
+	{
+		for (i=0 ; codeList[i] != NULL ; i++)
+		{
+			if (!std::strcmp(usericon,codeList[i]))
+			{
+				checkLadderIcon = 1;
+			}	
+		}
+	}
+	
+	if(checkLadderIcon == 1)
+	{
+				/* all solo and team rank special icons */
+		if ((account_get_ladder_rank2(account, clienttag, "Solo") < 11) & (account_get_ladder_rank2(account, clienttag, "Solo") != 0))
+			usericon="DERW"; 
+		else if ((account_get_ladder_rank2(account, clienttag, "Team") < 11) & (account_get_ladder_rank2(account, clienttag, "Team") != 0))
+			usericon="NRGW";
+		else if ((account_get_ladder_rank2(account, clienttag, "Solo") < 31) & (account_get_ladder_rank2(account, clienttag, "Solo") != 0))
+			usericon="DLGW";
+		else if ((account_get_ladder_rank2(account, clienttag, "Team") < 31) & (account_get_ladder_rank2(account, clienttag, "Team") != 0))
+			usericon="2LGW";
+		else if ((account_get_ladder_rank2(account, clienttag, "Solo") < 101) & (account_get_ladder_rank2(account, clienttag, "Solo") != 0))
+			usericon="RUPW";
+		else if ((account_get_ladder_rank2(account, clienttag, "Team") < 101) & (account_get_ladder_rank2(account, clienttag, "Team") != 0))
+			usericon="DNIW";
+		else {
+			usericon="";
+			}
+	
+		account_set_user_icon(account,clienttag,usericon);
+		conn_update_w3_playerinfo(c);
+		channel_rejoin(c);		
+			
+	}
+	
 }
 
 

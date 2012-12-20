@@ -1578,10 +1578,12 @@ extern int channel_set_userflags(t_connection * c)
     return -1;
 
   if (account_get_auth_admin(acc,channel) == 1 || account_get_auth_admin(acc,NULL) == 1)
-    newflags = MF_BLIZZARD;
+    newflags = std::strtoul("3",NULL,0); //newflags = MF_BLIZZARD;
   else if (account_get_auth_operator(acc,channel) == 1 ||
 	   account_get_auth_operator(acc,NULL) == 1)
-    newflags = MF_BNET;
+    newflags = std::strtoul("10",NULL,0); //newflags = MF_BNET;
+  else if ((channel_conn_is_tmpOP(conn_get_channel(c),c)) && ((account_get_auth_voice(acc,channel) == 1) || (channel_conn_has_tmpVOICE(conn_get_channel(c),c))))  
+	newflags = std::strtoul("6",NULL,0); //voice + tmpop;
   else if (channel_conn_is_tmpOP(conn_get_channel(c),c))
     newflags = MF_GAVEL;
   else if ((account_get_auth_voice(acc,channel) == 1) ||

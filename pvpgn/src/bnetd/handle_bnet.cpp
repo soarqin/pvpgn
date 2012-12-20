@@ -1658,6 +1658,18 @@ static int _client_loginreq2(t_connection * c, t_packet const *const packet)
 	    else {
 	        bn_int_set(&rpacket->u.server_loginreply1.message, SERVER_LOGINREPLY2_MESSAGE_BADPASS);
 	    }
+	} else if (account_get_actived(account) < (unsigned int)now) { /* default to false */
+      eventlog(eventlog_level_info, __FUNCTION__, "[%d] login for \"%s\" refused (this account need to be activated)", conn_get_socket(c), username);
+      if (supports_locked_reply) {
+          bn_int_set(&rpacket->u.server_loginreply1.message, SERVER_LOGINREPLY2_MESSAGE_LOCKED);
+          packet_append_string(rpacket, "Activate your account at www.eurobattle.net");
+					/* unload user */
+					account_unload(account);	
+      }
+      else {
+          bn_int_set(&rpacket->u.server_loginreply1.message, SERVER_LOGINREPLY2_MESSAGE_BADPASS);
+      }
+
 	} else if (conn_get_sessionkey(c) != bn_int_get(packet->u.client_loginreq2.sessionkey)) {
 	    eventlog(eventlog_level_error, __FUNCTION__, "[%d] login for \"%s\" refused (expected session key 0x%08x, got 0x%08x)", conn_get_socket(c), username, conn_get_sessionkey(c), bn_int_get(packet->u.client_loginreq2.sessionkey));
 	    bn_int_set(&rpacket->u.server_loginreply2.message, SERVER_LOGINREPLY2_MESSAGE_BADPASS);
@@ -2049,6 +2061,11 @@ static int _client_logonproofreq(t_connection * c, t_packet const *const packet)
 		    eventlog(eventlog_level_info, __FUNCTION__, "[%d] login for \"%s\" refused (this account is locked)", conn_get_socket(c), username);
 		    bn_int_set(&rpacket->u.server_logonproofreply.response, SERVER_LOGONPROOFREPLY_RESPONSE_CUSTOM);
 		    packet_append_string(rpacket, "This account has been locked.");
+    } else if (account_get_actived(account) < (unsigned int)now) { /* default to false */
+       eventlog(eventlog_level_info, __FUNCTION__, "[%d] login for \"%s\" refused (this account need to be activated)", conn_get_socket(c), username);
+       bn_int_set(&rpacket->u.server_logonproofreply.response, SERVER_LOGONPROOFREPLY_RESPONSE_CUSTOM);
+       packet_append_string(rpacket, "Activate account at www.eurobattle.net");
+       account_unload(account);
 		} else {
 		    t_hash serverhash;
 		    t_hash clienthash;

@@ -47,6 +47,14 @@ namespace pvpgn
 namespace bnetd
 {
 
+/* custom functions */
+
+extern unsigned int account_get_actived(t_account * account)
+{
+		return account_get_numattr(account,"custom\\user\\actived");
+}
+
+
 static unsigned int char_icon_to_uint(const char * icon);
 
 extern unsigned int account_get_numattr_real(t_account * account, char const * key, char const * fn, unsigned int ln)
@@ -382,7 +390,15 @@ extern int account_get_auth_mute(t_account * account)
 	return account_get_boolattr(account,"BNET\\auth\\mute");
 }
 
+extern int account_set_auth_ladderban(t_account * account, int val)
+{
+	return account_set_boolattr(account,"BNET\\auth\\ladban",val);
+}
 
+extern int account_get_auth_ladderban(t_account * account)
+{
+	return account_get_boolattr(account,"BNET\\auth\\ladban");
+}
 
 /****************************************************************/
 
@@ -457,6 +473,11 @@ extern char const * account_get_desc(t_account * account)
 extern unsigned int account_get_ll_time(t_account * account)
 {
     return account_get_numattr(account,"BNET\\acct\\lastlogin_time");
+}
+
+extern unsigned int account_get_ll_ctime(t_account * account)
+{
+    return account_get_numattr(account,"BNET\\acct\\ctime");
 }
 
 
@@ -1202,6 +1223,19 @@ extern int account_get_ladder_rank(t_account * account, t_clienttag clienttag, t
     return account_get_numattr(account,key);
 }
 
+extern int account_get_ladder_rank2(t_account * account, t_clienttag clienttag, const char* id)
+{
+    char key[256];
+    char clienttag_str[5];
+
+    if (!clienttag)
+    {
+	eventlog(eventlog_level_error,__FUNCTION__,"got bad clienttag");
+	return 0;
+    }
+    std::sprintf(key,"Record\\%s\\%s\\rank",tag_uint_to_str(clienttag_str,clienttag),id);
+    return account_get_numattr(account,key);
+}
 
 extern int account_set_ladder_rank(t_account * account, t_clienttag clienttag, t_ladder_id id, unsigned int rank)
 {
@@ -2429,6 +2463,23 @@ extern unsigned int account_icon_to_profile_icon(char const * icon,t_account * a
 	}
 	//eventlog(eventlog_level_debug,__FUNCTION__,"from [%4.4s] icon returned [0x%X]",icon,char_icon_to_uint(result));
 	return char_icon_to_uint(result);
+}
+
+extern int account_set_auth_icon(t_account * account, char const * icon_name, int val)
+{
+    char temp[256];
+	
+    std::sprintf(temp,"BNET\\auth\\icon\\%.100s",icon_name);
+    return account_set_boolattr(account, temp, val);
+}
+
+
+extern int account_get_auth_icon(t_account * account, char const * icon_name)
+{
+    char temp[256];
+
+    std::sprintf(temp,"BNET\\auth\\icon\\%.100s",icon_name);
+    return account_get_boolattr(account, temp);
 }
 
 extern int account_is_operator_or_admin(t_account * account, char const * channel)

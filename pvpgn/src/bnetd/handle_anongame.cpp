@@ -38,6 +38,7 @@
 #include "tournament.h"
 #include "channel.h"
 #include "common/setup_after.h"
+#include "message.h"
 
 namespace pvpgn
 {
@@ -49,6 +50,8 @@ namespace bnetd
 
 /* 0x00 */ /* PG style search - handle_anongame_search() in anongame.c */
 /* 0x01 */ /* server side packet sent from handle_anongame_search() in anongame.c */
+/* ---- */ /* moved back to handle_anongame by Shakar - due to ladder ban */
+/* ---- */ extern int handle_anongame_search(t_connection * c, t_packet const * packet);
 /* 0x02 */ static int _client_anongame_infos(t_connection * c, t_packet const * const packet);
 /* 0x03 */ static int _client_anongame_cancel(t_connection * c);
 /* 0x04 */ static int _client_anongame_profile(t_connection * c, t_packet const * const packet);
@@ -566,6 +569,23 @@ static int _client_anongame_set_icon(t_connection * c, t_packet const * const pa
 
     channel_rejoin(c);
     return 0;
+}
+
+extern int handle_anongame_search(t_connection * c, t_packet const *packet)
+{
+    if (account_get_auth_ladderban(conn_get_account(c))==1)
+	{   
+	  message_send_text(c,message_type_error,c,"Sorry, the following option is no longer available for your account.");
+	      return _client_anongame_cancel(c);
+	}
+
+    if (conn_get_latency(c) > 300) //todo: pick not allowed ping
+	{   
+	  message_send_text(c,message_type_error,c,"Your ping is too high, Please try again later.");
+	      return _client_anongame_cancel(c);
+	}
+	
+	return _handle_anongame_search(c, packet);
 }
 
 static int _client_anongame_infos(t_connection * c, t_packet const * const packet)

@@ -81,7 +81,7 @@ static unsigned int _anongame_get_gametype_tab(int queue);
 static int _anongame_totalplayers(int queue);
 static int _anongame_totalteams(int queue);
 
-static int _handle_anongame_search(t_connection * c, t_packet const *packet);
+//extern int _handle_anongame_search(t_connection * c, t_packet const *packet);
 static int _anongame_queue(t_connection * c, int queue, t_uint32 map_prefs);
 static int _anongame_compare_level(void const *a, void const *b);
 static int _anongame_order_queue(int queue);
@@ -380,7 +380,7 @@ static int _anongame_totalteams(int queue)
 }
 
 /**********/
-static int _handle_anongame_search(t_connection * c, t_packet const *packet)
+extern int _handle_anongame_search(t_connection * c, t_packet const *packet)
 {
     int i, j, temp, set = 1;
     t_packet *rpacket;
@@ -1039,10 +1039,10 @@ extern int anongame_matchlists_destroy()
 }
 
 /**********/
-extern int handle_anongame_search(t_connection * c, t_packet const *packet)
+/*extern int handle_anongame_search(t_connection * c, t_packet const *packet)
 {
     return _handle_anongame_search(c, packet);
-}
+}*/
 
 extern int anongame_unqueue(t_connection * c, int queue)
 {
