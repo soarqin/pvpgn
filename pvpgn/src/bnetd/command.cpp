@@ -768,7 +768,7 @@ static int _handle_clan_command(t_connection * c, char const * text)
               if (j<sizeof(clanname)-1) clanname[j++] = text[i];
           clanname[j] = '\0';
 
-		message_send_text(c,message_type_error,c,"clan create command is disabled on EuroBattle.Net!");
+		message_send_text(c,message_type_error,c,"clan create command is disabled on PvPGN!");
         return 0;		
 			
           if ((clantag[0]=='\0') || (clanname[0]=='\0')) {
@@ -1709,7 +1709,7 @@ static int _handle_friends_command(t_connection * c, char const * text)
 	int num;
 	unsigned int uid;
 
-	message_send_text(c,message_type_info,c,"Your EuroBattle.Net - Friends List");
+	message_send_text(c,message_type_info,c,"Your PvPGN - Friends List");
 	message_send_text(c,message_type_info,c,"=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
 	num = account_get_friendcount(my_acc);
 
@@ -2672,9 +2672,9 @@ static int _handle_time_command(t_connection * c, char const *text)
   btlocal = bnettime_add_tzbias(btsystem,local_tzbias());
   now = bnettime_to_time(btlocal);
   if (!(tmnow = std::gmtime(&now)))
-    std::strcpy(msgtemp,"EuroBattle.Net Server Time: ?");
+    std::strcpy(msgtemp,"PvPGN Server Time: ?");
   else
-    std::strftime(msgtemp,sizeof(msgtemp),"EuroBattle.Net Server Time: %a %b %d %H:%M:%S",tmnow);
+    std::strftime(msgtemp,sizeof(msgtemp),"PvPGN Server Time: %a %b %d %H:%M:%S",tmnow);
   message_send_text(c,message_type_info,c,msgtemp);
   if (conn_get_class(c)==conn_class_bnet)
     {
@@ -5019,6 +5019,7 @@ static int _handle_ipscan_command(t_connection * c, char const * text)
     t_account * account;
     t_connection * conn;
     char const * ip;
+	char const local_ip[64] = "";
 
 	eventlog(eventlog_level_info,__FUNCTION__,"[COMMAND] user \"%s\" run command %s",account_get_name(conn_get_account(c)),text);	
 	
@@ -5037,7 +5038,8 @@ static int _handle_ipscan_command(t_connection * c, char const * text)
         conn = account_get_conn(account);
         if (conn) {
            // conn_get_addr returns int, so there can never be a NULL string construct
-           ip = addr_num_to_ip_str(conn_get_addr(conn));
+           ip = local_ip;
+           std::strncpy((char*)ip,addr_num_to_ip_str(conn_get_addr(conn)),64);
            snprintf(msgtemp, sizeof(msgtemp), "Scanning online users for IP %s!", ip);
            message_send_text(c,message_type_error,c,msgtemp);
         }
@@ -5271,7 +5273,7 @@ const char *descriptionList[] = {"fist-blue (Blue Midas)","fist-red (Red Midas)"
 		return 0;
 		}
 		else {
-			snprintf(msgtemp, sizeof(msgtemp), "You must be a EuroBattle.Net crew member to set this icon!");
+			snprintf(msgtemp, sizeof(msgtemp), "You must be a PvPGN crew member to set this icon!");
 			message_send_text(c,message_type_error,c,msgtemp);	
 			return 0;		
 			}	
